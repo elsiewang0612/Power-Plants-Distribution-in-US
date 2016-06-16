@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8 />
+    <title>Power Plants Distribution</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: whitesmoke;
+            font-family: Lato, sans-serif;
+            color: #0D0000;
+        }
+        header {
+            padding: 6px 10%;
+        }
+        h1 {
+            display: inline-block;
+            margin-right: 20px;
+            color: #001323;
+        }
+        h2 {
+            display: inline-block;
+            color: #001323;
+        }
+        #map {
+            width: 80%;
+            height: 540px;
+            margin: 10px auto;
+        }
+        footer {
+            padding: 6px 10%;
+            width: 80%;
+        }
+        p {
+            font-size: 1em;
+            color: #001323;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Power Plants Distribution in US</h1>
+        <h2>Coal, Hydro, Nuclear</h2>
+    </header>
+
+    <div id='map'></div>
+
+    <footer>
+        <p>Map authored by Xi Wang</p>
+        <p>The data are obtained from the {EIA's form 923](http://www.eia.gov/electricity/data/eia923/). This map show all power plants fueled by coal, hydro, nuclear or any combination among them. Once the user decide the intrested place, the map will show all power plants within 500 meters. For each power plant, the map will show the the name, fuel source type and the distance between the place at where users are intrested. </p>
+    </footer>
+
+    <script src="power-plants.js"></script>
+    <script>
+
+       var map = L.map('map', {
+          center: [36,-94],
+          zoom: 4,
+      });
+      
+      var tiles = L.tileLayer('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
+          subdomains: 'abcd',
+          maxZoom: 19
+      });  
+      
+      tiles.addTo(map);
+        
+        var radiusCircle = L.circle([0, 0], 500000, {
+            fillColor: 'white',
+            fillOpacity: .1,
+            color: 'yellow',
+            opacity: .3,
+            stroke: false,
+            weight: 3,
+        }).addTo(map);
+        
+var coalLayer = L.geoJson(plants, {
+          pointToLayer: function(feature,latlng) {
+              return L.circleMarker(latlng);
+          },
+          filter: function(feature) {
+              if(feature.properties.fuel_source.Coal) {
+                return feature;
+              }
+          },
+          style: function(feature) {
+              return {
+                color: '#FF0000',
+                fillColor: '#FF0000',
+                weight: 1,
+                stroke: 1,
+                fillOpacity: .8,
+                radius: getRadius(feature.properties.fuel_source.Coal)
+              } 
+          } 
+      }).addTo(map);
+        
+      var hydroLayer = L.geoJson(plants, {
+            pointToLayer: function(feature,latlng) {
+                return L.circleMarker(latlng);
+            },
+            filter: function(feature) {
+                if(feature.properties.fuel_source.Hydro) {
+                    return feature;
+                }
+            },
+            style: function(feature) {
+                return {
+                    color: '#1f78b4',
+                    fillColor: '#1f78b4',
+                    weight: 1,
+                    stroke: 1,
+                    fillOpacity: .8,
+                    radius: getRadius(feature.properties.fuel_source.Hydro)
+                } 
+            } 
+        }).addTo(map);
+        
+     var nuclearLayer = L.geoJson(plants, {
+            pointToLayer: function(feature,latlng) {
+                return L.circleMarker(latlng);
+            },
+            filter: function(feature) {
+                if(feature.properties.fuel_source.Nuclear) {
+                    return feature;
+                }
+            },
+            style: function(feature) {
+                return {
+                    color: '#00FFFF',
+                    fillColor: '#00FFFF',
+                    weight: 1,
+                    stroke: 1,
+                    fillOpacity: .8,
+                    radius: getRadius(feature.properties.fuel_source.Nuclear)
+                } 
+            } 
+        }).addTo(map);
+        
+        function getRadius(area) {
+                     var radius = Math.sqrt(area/Math.PI);
+                     return radius * .6;
+                 };
+       var sourcesLayers = {
+            "<b style='color:#FF0000'>Coal</b>": coalLayer,
+            "<b style='color:#1f78b4'>Hydro</b>": hydroLayer,
+            "<b style='color:#00FFFF; text-shadow: 0px 0px 1px #333;'>Nuclear</b>": nuclearLayer
+        }
+        L.control.layers(null, sourcesLayers, { collapsed:false }).addTo(map);
+        
+        var fuelSourceLayers = L.layerGroup([coalLayer, hydroLayer, nuclearLayer]);
+        
+        map.on('click', function(e) {
+            
+            radiusCircle.setLatLng(e.latlng);
+            
+            fuelSourceLayers.eachLayer(function(l) {
+                l.eachLayer(function(layer) {
+                    
+                    var distance = e.latlng.distanceTo(layer.getLatLng())/1000;
+                    if(distance > 500) {
+                        layer.setStyle({
+                            stroke: false,
+                            fill: false
+                        });  
+                    } else {
+                        layer.setStyle({
+                            stroke: true,
+                            fill: true  
+                        });  
+             
+                        layer.bindPopup("<b>"+layer.feature.properties.plant_name+"</b><br>"
+                                        +"<b>Fuel Source</b>: "+Object.getOwnPropertyNames(layer.feature.properties.fuel_source)+"</b><br>"
+                            +"I am <b>"+distance.toLocaleString()+"km</b><br> from the click point.");
+                    }        
+                })
+            });
+    }); 
+    </script>
+    
+</body>
+
+</html>
